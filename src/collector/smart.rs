@@ -143,7 +143,7 @@ pub fn collect_smart(devices: &[String]) -> Result<Vec<DriveHealth>, SmartError>
 
 fn collect_drive_health(device: &str) -> Result<DriveHealth, SmartError> {
     let output = Command::new("smartctl")
-        .args(["-A", "--json", device])
+        .args(["-a", "--json", device])
         .output()?;
 
     // smartctl returns non-zero for various reasons, try to parse anyway
