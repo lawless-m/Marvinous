@@ -1,0 +1,36 @@
+# Hardware Baseline Configuration
+# Defines the actual installed hardware so Marvinous knows what's normal
+
+[system]
+# Server model/description
+description = "GIGABYTE MD70-HB0 Dual Xeon E5-2660 v3"
+cpu_count = 2
+cpu_model = "Intel Xeon E5-2660 v3"
+
+[memory]
+# Define installed DIMM slots (empty slots won't be flagged as issues)
+installed_slots = [
+    "DIMM_P0_C0", "DIMM_P0_C1", "DIMM_P0_D0", "DIMM_P0_D1",
+    "DIMM_P1_E0", "DIMM_P1_E1", "DIMM_P1_F0", "DIMM_P1_F1"
+]
+total_capacity_gb = 64
+
+[cooling]
+# Define which fan headers have fans installed
+installed_fans = ["CPU0_FAN", "CPU1_FAN", "SYS_FAN5"]
+
+# Expected speed ranges (RPM)
+[cooling.expected_rpm]
+CPU0_FAN = { min = 1000, max = 3000 }
+CPU1_FAN = { min = 1000, max = 3000 }
+SYS_FAN5 = { min = 800, max = 2000 }
+
+[storage]
+# Expected drives
+expected_drives = ["/dev/sda", "/dev/sdb", "/dev/sdc", "/dev/sdd"]
+drive_type = "SSD"
+
+[gpu]
+# Installed GPU
+installed = true
+model = "NVIDIA GeForce RTX 3090"
