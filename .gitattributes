@@ -7,86 +7,20 @@
 # Cargo files
 Cargo.toml text linguist-language=TOML
 Cargo.lock text linguist-generated=true
-.cargo/config.toml text
 
-# Build configuration
-build.rs text diff=rust
-rust-toolchain.toml text
-
-# Configuration files
+# Configuration
 *.toml text
-*.json text
-*.yml text
-*.yaml text
 
 # Documentation
 *.md text diff=markdown
-LICENSE text
-LICENSE-MIT text
-LICENSE-APACHE text
-AUTHORS text
-CHANGELOG.md text diff=markdown
+LICENSE* text
 
 # Scripts
 *.sh text eol=lf
-install.sh text eol=lf
-uninstall.sh text eol=lf
 
-# Systemd service files
-*.service text eol=lf
-*.timer text eol=lf
-*.socket text eol=lf
-*.target text eol=lf
-*.path text eol=lf
-
-# Environment and config
-*.env text
-*.env.example text
-.envrc text
-
-# Web files (for dashboard/API)
-*.html text diff=html
-*.css text diff=css
-*.js text
-
-# Compiled binaries - binary
+# Compiled binaries
 target/** binary
-
-# Compressed files - binary
-*.zip binary
-*.gz binary
-*.tar binary
-*.tar.gz binary
-*.xz binary
-
-# Image files - binary
-*.png binary
-*.jpg binary
-*.jpeg binary
-*.gif binary
-*.ico binary
-*.svg text
-*.webp binary
-
-# Database files - binary
-*.db binary
-*.sqlite binary
-*.sqlite3 binary
-
-# Log files
-*.log text
-
-# Docker
-Dockerfile text
-docker-compose.yml text
-docker-compose.yaml text
-.dockerignore text
 
 # Git files
 .gitignore text
 .gitattributes text
-
-# CI/CD
-.github/**/*.yml text
-.github/**/*.yaml text
-.gitlab-ci.yml text
