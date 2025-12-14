@@ -24,3 +24,6 @@ target/** binary
 # Git files
 .gitignore text
 .gitattributes text
+
+# Exclude template/utility scripts from language stats
+sync-repo.ps1 linguist-vendored
