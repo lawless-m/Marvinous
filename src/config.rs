@@ -27,6 +27,8 @@ pub struct Config {
     #[serde(default)]
     pub sensors: SensorsConfig,
     #[serde(default)]
+    pub ipmi: IpmiConfig,
+    #[serde(default)]
     pub gpu: GpuConfig,
 }
 
@@ -76,6 +78,14 @@ pub struct SensorsConfig {
     pub enabled: bool,
     #[serde(default = "default_true")]
     pub json_format: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IpmiConfig {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default = "default_true")]
+    pub optional: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -178,6 +188,15 @@ impl Default for SensorsConfig {
     }
 }
 
+impl Default for IpmiConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            optional: true,
+        }
+    }
+}
+
 impl Default for GpuConfig {
     fn default() -> Self {
         Self {
@@ -195,6 +214,7 @@ impl Default for Config {
             collection: CollectionConfig::default(),
             storage: StorageConfig::default(),
             sensors: SensorsConfig::default(),
+            ipmi: IpmiConfig::default(),
             gpu: GpuConfig::default(),
         }
     }

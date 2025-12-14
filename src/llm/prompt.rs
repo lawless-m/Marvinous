@@ -105,6 +105,17 @@ pub fn build_prompt(data: &CollectedData, prompt_file: &Path) -> String {
     }
     prompt.push('\n');
 
+    // IPMI section
+    prompt.push_str("=== IPMI BMC SENSORS ===\n");
+    if data.ipmi.is_empty() {
+        prompt.push_str("No IPMI BMC data available.\n");
+    } else {
+        for reading in &data.ipmi {
+            prompt.push_str(&format!("{} | {} | {}\n", reading.sensor, reading.value, reading.status));
+        }
+    }
+    prompt.push('\n');
+
     // GPU section
     prompt.push_str("=== GPU STATUS ===\n");
     match &data.gpu {

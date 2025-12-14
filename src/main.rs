@@ -13,8 +13,8 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use collector::{
-    collect_gpu, collect_kernel_logs, collect_sensors, collect_smart, collect_system_logs,
-    CollectedData,
+    collect_gpu, collect_ipmi, collect_kernel_logs, collect_sensors, collect_smart,
+    collect_system_logs, CollectedData,
 };
 use config::Config;
 use llm::{build_prompt, OllamaClient};
@@ -150,6 +150,25 @@ async fn run(config: &Config, args: &Args) -> Result<(), MarvinError> {
         vec![]
     };
 
+    let ipmi = if config.ipmi.enabled {
+        match collect_ipmi() {
+            Ok(readings) => {
+                tracing::info!("Collected {} IPMI sensor readings", readings.len());
+                readings
+            }
+            Err(e) => {
+                if config.ipmi.optional {
+                    tracing::warn!("Failed to collect IPMI data (optional): {}", e);
+                    vec![]
+                } else {
+                    return Err(MarvinError::Collection(format!("IPMI collection failed: {}", e)));
+                }
+            }
+        }
+    } else {
+        vec![]
+    };
+
     let gpu = if config.gpu.enabled {
         match collect_gpu() {
             Ok(Some(gpu)) => {
@@ -197,6 +216,7 @@ async fn run(config: &Config, args: &Args) -> Result<(), MarvinError> {
         system_logs,
         kernel_logs,
         sensors: sensors.clone(),
+        ipmi: ipmi.clone(),
         gpu: gpu.clone(),
         drives: drives.clone(),
         previous,
