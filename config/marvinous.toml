@@ -1,0 +1,80 @@
+# Marvinous Configuration
+# "I've got this terrible pain in all the diodes down my left side."
+
+[general]
+# Where to write hourly reports
+report_dir = "/var/log/marvinous/reports"
+
+# State file for trend comparison
+state_file = "/var/log/marvinous/state/previous.json"
+
+# System prompt template
+prompt_file = "/etc/marvinous/system-prompt.txt"
+
+# Log level: trace, debug, info, warn, error
+log_level = "info"
+
+
+[ollama]
+# Ollama API endpoint
+endpoint = "http://localhost:11434"
+
+# Model to use - Qwen 2.5 recommended
+model = "qwen2.5:7b"
+
+# Timeout for LLM generation (seconds)
+timeout_secs = 120
+
+
+[collection]
+# How far back to collect logs
+log_since = "1 hour ago"
+
+# Maximum log priority (0=emerg, 5=notice, 7=debug)
+# Default 5 includes: emerg, alert, crit, err, warning, notice
+# Excludes: info (6), debug (7)
+log_priority_max = 5
+
+# Include kernel ring buffer logs
+include_kernel = true
+
+# Maximum log entries to send to LLM (prevents token overflow)
+max_log_entries = 500
+
+
+[storage]
+# Drives to monitor with smartctl
+# Empty array = auto-detect all drives
+# Explicit list = only these drives
+devices = []
+
+# Examples:
+# devices = ["/dev/sda", "/dev/sdb"]
+# devices = ["/dev/nvme0n1", "/dev/nvme1n1"]
+
+
+[sensors]
+# Include sensors output
+enabled = true
+
+# Use JSON output (recommended)
+json_format = true
+
+
+[gpu]
+# Include nvidia-smi output
+enabled = true
+
+# Fail silently if no NVIDIA GPU present
+optional = true
+
+
+[notifications]
+# Future feature - not yet implemented
+enabled = false
+
+# Notification endpoint (ntfy, webhook, etc.)
+# endpoint = "https://ntfy.sh/my-server-alerts"
+
+# Only notify on these severities
+# notify_on = ["CONCERN", "CRITICAL"]

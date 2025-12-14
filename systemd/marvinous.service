@@ -1,0 +1,17 @@
+[Unit]
+Description=Marvinous Server Monitor
+After=network.target ollama.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/marvinous
+User=root
+Group=root
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=marvinous
+
+[Install]
+WantedBy=multi-user.target
