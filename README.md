@@ -16,8 +16,10 @@ Marvinous watches your servers with the same enthusiasm Marvin has for... well, 
 - **SMART Drive Health** - Automated monitoring of reallocated sectors, pending sectors, and drive temperatures
 - **GPU Monitoring** - NVIDIA GPU temperature, memory usage, and power draw tracking
 - **LLM-Powered Reports** - Hourly analysis via Ollama (qwen2.5:7b) with Marvin's personality
+- **Web Dashboard** - Real-time web interface on port 9090 with manual collection triggers and severity-coded reports
+- **Daily Summaries** - Automated daily consolidation and ZIP archiving of hourly reports
 - **Trend Analysis** - Compares current readings against previous hour to detect changes
-- **Systemd Integration** - Automated hourly reports via systemd timer
+- **Systemd Integration** - Automated hourly reports, daily summaries, and web server via systemd timers
 
 ## Quick Start
 
@@ -39,8 +41,19 @@ cargo build --release
 sudo cp target/release/marvinous /usr/local/bin/
 sudo cp config/marvinous.toml /etc/marvinous/
 sudo cp prompts/system-prompt.txt /etc/marvinous/
+sudo mkdir -p /usr/share/marvinous
+sudo cp -r src/web/static /usr/share/marvinous/
+
+# Install systemd services
 sudo cp systemd/marvinous.{service,timer} /etc/systemd/system/
-sudo systemctl enable --now marvinous.timer
+sudo cp systemd/marvinous-web.service /etc/systemd/system/
+sudo cp systemd/marvinous-daily.{service,timer} /etc/systemd/system/
+sudo systemctl daemon-reload
+
+# Enable services
+sudo systemctl enable --now marvinous.timer        # Hourly reports
+sudo systemctl enable --now marvinous-web.service  # Web dashboard
+sudo systemctl enable --now marvinous-daily.timer  # Daily summaries
 ```
 
 ## Configuration
@@ -64,14 +77,21 @@ optional = true
 [gpu]
 enabled = true  # NVIDIA GPU monitoring
 optional = true
+
+[web]
+enabled = true
+port = 9090
+bind_address = "0.0.0.0"  # Listen on all interfaces
 ```
 
 Update the hardware baseline in `/etc/marvinous/system-prompt.txt` to match your actual server configuration (CPUs, installed DIMMs, fans, drives).
 
 ## Usage
 
+### Command Line
+
 ```bash
-# Run manually (generates report immediately)
+# Run manual collection (generates report immediately)
 sudo marvinous
 
 # View raw collected data without LLM analysis
@@ -80,11 +100,58 @@ sudo marvinous --dry-run
 # See what prompt is sent to the LLM
 sudo marvinous --show-prompt
 
+# Generate daily summary (runs at 00:05 via timer)
+sudo marvinous --daily-summary
+
 # Check timer status
-systemctl list-timers marvinous.timer
+systemctl list-timers marvinous.timer marvinous-daily.timer
 
 # View latest report
 cat /var/log/marvinous/reports/$(ls -t /var/log/marvinous/reports/ | head -1)
+```
+
+### Web Dashboard
+
+Access the web interface at `http://your-server:9090`
+
+**Features:**
+- View all reports with severity color coding
+  - **OK** (green): System healthy
+  - **WATCH** (orange): Minor anomalies worth monitoring
+  - **CONCERN** (red): Issues needing attention
+  - **CRITICAL** (pulsing red): Immediate action required
+- Trigger manual collections via web UI
+- Real-time collection status indicator
+- Click to expand report details inline
+- Auto-refresh status every 5 seconds
+
+**Service Management:**
+```bash
+# Start/stop web server
+sudo systemctl start marvinous-web
+sudo systemctl stop marvinous-web
+
+# View web server logs
+sudo journalctl -u marvinous-web -f
+```
+
+### Daily Summaries
+
+Marvinous automatically generates daily summaries at 00:05 UTC:
+
+1. Consolidates all hourly reports from previous day
+2. Sends to LLM for daily overview analysis
+3. Creates `YYYY-MM-DD-DAILY.md` in reports directory
+4. Archives hourly reports to `archive/YYYY-MM-DD.zip`
+5. Removes archived hourly reports
+
+**Reports Location:**
+```bash
+# Current reports and daily summaries
+ls /var/log/marvinous/reports/
+
+# Archived hourly reports (ZIP files)
+ls /var/log/marvinous/reports/archive/
 ```
 
 ## Sample Report
@@ -130,8 +197,9 @@ NVIDIA GeForce RTX 3090 chilling at 46°C with barely any load.
 ```
 marvinous/
 ├── src/
-│   ├── main.rs              # Entry point and orchestration
+│   ├── main.rs              # Entry point and CLI orchestration
 │   ├── config.rs            # Configuration management
+│   ├── daily.rs             # Daily summary and archiving
 │   ├── collector/           # Data collection modules
 │   │   ├── ipmi.rs          # IPMI BMC sensor collection
 │   │   ├── smart.rs         # SMART drive health
@@ -141,17 +209,29 @@ marvinous/
 │   ├── llm/                 # LLM interaction
 │   │   ├── client.rs        # Ollama API client
 │   │   └── prompt.rs        # Prompt building
-│   └── output/              # Report generation
-│       ├── report.rs        # Markdown report writer
-│       └── state.rs         # Trend comparison state
+│   ├── output/              # Report generation
+│   │   ├── report.rs        # Markdown report writer
+│   │   └── state.rs         # Trend comparison state
+│   └── web/                 # Web dashboard (Axum)
+│       ├── server.rs        # HTTP server setup
+│       ├── handlers.rs      # API endpoint handlers
+│       ├── models.rs        # Request/response types
+│       ├── state.rs         # Shared application state
+│       └── static/          # Frontend assets
+│           └── index.html   # Dashboard UI
 ├── config/
 │   ├── marvinous.toml       # Main configuration
 │   └── hardware-baseline.toml  # Hardware documentation
 ├── prompts/
 │   └── system-prompt.txt    # Marvin's personality & instructions
 ├── systemd/
-│   ├── marvinous.service    # Systemd service unit
-│   └── marvinous.timer      # Hourly execution timer
+│   ├── marvinous.service    # Hourly collection service
+│   ├── marvinous.timer      # Hourly collection timer
+│   ├── marvinous-web.service    # Web dashboard service
+│   ├── marvinous-daily.service  # Daily summary service
+│   └── marvinous-daily.timer    # Daily summary timer (00:05)
+├── scripts/
+│   └── ollama-vram.sh       # VRAM management utility
 └── BUILD_AND_DEPLOY.md      # Deployment guide
 ```
 
@@ -181,6 +261,65 @@ marvinous/
 - Kernel messages
 - Service status changes
 - Security events (sudo, ssh)
+
+## Web Dashboard API
+
+The web dashboard exposes a REST API on port 9090:
+
+**Endpoints:**
+
+```
+GET  /                            - Dashboard HTML interface
+GET  /health                      - Health check (returns {"status":"ok","version":"0.1.0"})
+GET  /api/reports                 - List all reports with metadata
+GET  /api/reports/:filename       - Get specific report content
+POST /api/collect                 - Trigger manual collection (background task)
+GET  /api/status                  - Current collection status (running/idle, last_run)
+```
+
+**Example API Usage:**
+
+```bash
+# Check health
+curl http://localhost:9090/health
+
+# List all reports
+curl http://localhost:9090/api/reports
+
+# Get specific report
+curl http://localhost:9090/api/reports/2025-12-14-15.md
+
+# Trigger manual collection
+curl -X POST http://localhost:9090/api/collect
+
+# Check collection status
+curl http://localhost:9090/api/status
+```
+
+## Utilities
+
+### VRAM Management
+
+The `ollama-vram.sh` script helps manage GPU memory:
+
+```bash
+# Check current VRAM usage and loaded models
+./scripts/ollama-vram.sh status
+
+# Unload all models from VRAM (free memory)
+./scripts/ollama-vram.sh unload
+
+# Pre-load qwen2.5:7b into VRAM (faster first report)
+./scripts/ollama-vram.sh load
+
+# Real-time VRAM monitoring (refreshes every 2s)
+./scripts/ollama-vram.sh watch
+```
+
+Useful for:
+- Freeing VRAM before GPU-intensive tasks
+- Pre-warming the model before batch collections
+- Monitoring memory usage during development
 
 ## Contributing
 
