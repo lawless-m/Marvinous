@@ -1,89 +1,128 @@
 # Marvinous
 
+![Marvinous](Marvinous.png)
+
 *"Here I am, brain the size of a planet, and they ask me to monitor server metrics. Call that job satisfaction? 'Cause I don't."*
 
 An LLM-powered server monitoring tool with the personality of Marvin the Paranoid Android from The Hitchhiker's Guide to the Galaxy.
 
 ## Overview
 
-Marvinous watches your servers with the same enthusiasm Marvin has for... well, everything. It monitors system health, predicts failures, and reports issues with the existential dread they deserve.
+Marvinous watches your servers with the same enthusiasm Marvin has for... well, everything. It collects comprehensive hardware metrics via IPMI, monitors storage health, and generates hourly reports with existential dread and sardonic observations.
 
 **Features:**
 
-- Real-time system metrics collection (CPU, memory, disk, network)
-- LLM-powered anomaly detection and prediction
-- Alerts delivered with appropriate levels of pessimism
-- REST API for integration with other tools (not that they'll appreciate it)
-- Systemd service for reliable operation (more reliable than the universe, anyway)
+- **IPMI BMC Monitoring** - 80+ sensors including CPU/DIMM temps, fan speeds, voltages, and current draw
+- **SMART Drive Health** - Automated monitoring of reallocated sectors, pending sectors, and drive temperatures
+- **GPU Monitoring** - NVIDIA GPU temperature, memory usage, and power draw tracking
+- **LLM-Powered Reports** - Hourly analysis via Ollama (qwen2.5:7b) with Marvin's personality
+- **Trend Analysis** - Compares current readings against previous hour to detect changes
+- **Systemd Integration** - Automated hourly reports via systemd timer
 
-## Installation
+## Quick Start
 
+See [BUILD_AND_DEPLOY.md](BUILD_AND_DEPLOY.md) for complete installation instructions.
+
+**Prerequisites:**
+- Rust 1.70+
+- Ollama with qwen2.5:7b model
+- IPMI-capable server hardware (optional but recommended)
+- ipmitool, smartmontools, lm-sensors
+
+**Quick Install:**
 ```bash
-# Clone the repository (if you must)
-git clone https://github.com/lawless-m/Marvinous.git
-cd Marvinous
+# Install dependencies
+sudo apt install build-essential pkg-config libssl-dev lm-sensors smartmontools ipmitool
 
-# Build with Cargo
+# Build and install
 cargo build --release
-
-# Install the systemd service
-sudo cp marvinous.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now marvinous
+sudo cp target/release/marvinous /usr/local/bin/
+sudo cp config/marvinous.toml /etc/marvinous/
+sudo cp prompts/system-prompt.txt /etc/marvinous/
+sudo cp systemd/marvinous.{service,timer} /etc/systemd/system/
+sudo systemctl enable --now marvinous.timer
 ```
 
 ## Configuration
 
-Copy the example configuration:
+Edit `/etc/marvinous/marvinous.toml`:
 
-```bash
-cp config.example.toml config.toml
+```toml
+[general]
+report_dir = "/var/log/marvinous/reports"
+state_file = "/var/log/marvinous/state/previous.json"
+prompt_file = "/etc/marvinous/system-prompt.txt"
+
+[ollama]
+endpoint = "http://localhost:11434"
+model = "qwen2.5:7b"
+
+[ipmi]
+enabled = true  # Comprehensive BMC sensor monitoring
+optional = true
+
+[gpu]
+enabled = true  # NVIDIA GPU monitoring
+optional = true
 ```
 
-Edit `config.toml` to configure:
-
-- Monitoring intervals
-- Alert thresholds
-- LLM provider settings
-- Notification channels
+Update the hardware baseline in `/etc/marvinous/system-prompt.txt` to match your actual server configuration (CPUs, installed DIMMs, fans, drives).
 
 ## Usage
 
 ```bash
-# Run directly
-./target/release/marvinous
+# Run manually (generates report immediately)
+sudo marvinous
 
-# Or via systemd
-sudo systemctl start marvinous
-sudo systemctl status marvinous
+# View raw collected data without LLM analysis
+sudo marvinous --dry-run
 
-# View the logs (riveting reading, I'm sure)
-journalctl -u marvinous -f
+# See what prompt is sent to the LLM
+sudo marvinous --show-prompt
+
+# Check timer status
+systemctl list-timers marvinous.timer
+
+# View latest report
+cat /var/log/marvinous/reports/$(ls -t /var/log/marvinous/reports/ | head -1)
 ```
 
-## API Endpoints
+## Sample Report
 
-| Endpoint | Description |
-|----------|-------------|
-| `GET /health` | Service health check |
-| `GET /metrics` | Current system metrics |
-| `GET /alerts` | Recent alerts |
-| `GET /mood` | Marvin's current disposition (spoiler: it's not good) |
+```markdown
+# Marvinous Report: 2025-12-14 18:00
 
-## Sample Alert
+## Summary
+OK: Today's readings are... just as boring as always.
 
-```
-ALERT: Disk usage at 89%
+## Notable Events
+- Root login via sudo - what a waste of time.
 
-"I've been watching this disk fill up for 3,247,891 seconds now.
-The first ten million seconds were the worst. And the second ten
-million, they were the worst too. The third ten million I didn't
-enjoy at all. After that, I went into a bit of a decline.
+## Concerns
+Disappointingly, there are no issues to report.
 
-Anyway, you might want to free up some space. Or don't.
-It's not like anything matters in the end."
+## Sensors
 
-- Marvin
+### Fans
+CPU0_FAN | 1900 RPM | ok
+CPU1_FAN | 1900 RPM | ok
+SYS_FAN5 | 1200 RPM | ok
+
+### IPMI Sensors
+- CPU0: 30°C, CPU1: 35°C
+- DIMMs: 27-34°C (8 installed, 8 empty slots)
+- All voltages nominal (12V, 5V, 3.3V rails)
+
+### Storage Health
+All drives healthy:
+- Reallocated Sectors: 0
+- Pending Sectors: 0
+- Temperatures: 40°C
+
+### GPU Status
+NVIDIA GeForce RTX 3090 chilling at 46°C with barely any load.
+
+*Signed off by Marvinous.*
 ```
 
 ## Architecture
@@ -91,19 +130,67 @@ It's not like anything matters in the end."
 ```
 marvinous/
 ├── src/
-│   ├── main.rs           # Entry point (the beginning of the end)
-│   ├── collector/        # Metrics collection
-│   ├── analyzer/         # LLM-powered analysis
-│   ├── alerter/          # Notification dispatch
-│   └── personality/      # Marvin's worldview
-├── config.example.toml   # Configuration template
-├── marvinous.service     # Systemd unit file
-└── Cargo.toml
+│   ├── main.rs              # Entry point and orchestration
+│   ├── config.rs            # Configuration management
+│   ├── collector/           # Data collection modules
+│   │   ├── ipmi.rs          # IPMI BMC sensor collection
+│   │   ├── smart.rs         # SMART drive health
+│   │   ├── nvidia.rs        # GPU monitoring
+│   │   ├── sensors.rs       # lm-sensors (optional)
+│   │   └── journalctl.rs    # System/kernel logs
+│   ├── llm/                 # LLM interaction
+│   │   ├── client.rs        # Ollama API client
+│   │   └── prompt.rs        # Prompt building
+│   └── output/              # Report generation
+│       ├── report.rs        # Markdown report writer
+│       └── state.rs         # Trend comparison state
+├── config/
+│   ├── marvinous.toml       # Main configuration
+│   └── hardware-baseline.toml  # Hardware documentation
+├── prompts/
+│   └── system-prompt.txt    # Marvin's personality & instructions
+├── systemd/
+│   ├── marvinous.service    # Systemd service unit
+│   └── marvinous.timer      # Hourly execution timer
+└── BUILD_AND_DEPLOY.md      # Deployment guide
 ```
+
+## Monitored Metrics
+
+### IPMI BMC (80 sensors)
+- **Temperatures**: CPU packages, DIMM modules, voltage regulators, PCH
+- **Fan Speeds**: CPU fans, chassis fans (RPM)
+- **Voltages**: 12V, 5V, 3.3V rails and all CPU/DIMM power supplies
+- **Current**: Per-CPU and per-DIMM bank amperage
+
+### Storage (SMART)
+- Device model and serial number
+- Reallocated sectors (ID 5)
+- Pending sectors (ID 197)
+- Temperature (ID 194)
+- Power-on hours (ID 9)
+
+### GPU (nvidia-smi)
+- GPU temperature
+- Memory usage (used/total)
+- GPU utilization percentage
+- Power draw (watts)
+
+### System Logs
+- Last hour of system logs (journalctl)
+- Kernel messages
+- Service status changes
+- Security events (sudo, ssh)
 
 ## Contributing
 
 Contributions are welcome, though Marvin would point out that in the grand cosmic scheme, your pull request is ultimately meaningless. But please, don't let that stop you.
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes (IPMI sensors, new collectors, prompt improvements)
+4. Add tests if applicable
+5. Submit a pull request
 
 ## License
 
