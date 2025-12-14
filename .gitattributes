@@ -1,66 +1,63 @@
 # Auto detect text files and perform LF normalization
 * text=auto
 
-# C# source files
-*.cs text diff=csharp
-*.csx text diff=csharp
+# Rust source files
+*.rs text diff=rust linguist-language=Rust
 
-# Project and solution files
-*.csproj text merge=union
-*.sln text eol=crlf merge=union
-*.props text
-*.targets text
+# Cargo files
+Cargo.toml text linguist-language=TOML
+Cargo.lock text linguist-generated=true
+.cargo/config.toml text
+
+# Build configuration
+build.rs text diff=rust
+rust-toolchain.toml text
 
 # Configuration files
+*.toml text
 *.json text
-*.xml text
-*.config text
 *.yml text
 *.yaml text
-*.toml text
 
 # Documentation
 *.md text diff=markdown
-*.txt text
 LICENSE text
+LICENSE-MIT text
+LICENSE-APACHE text
 AUTHORS text
+CHANGELOG.md text diff=markdown
 
 # Scripts
-*.ps1 text eol=crlf
-*.psm1 text eol=crlf
-*.psd1 text eol=crlf
-*.bat text eol=crlf
-*.cmd text eol=crlf
 *.sh text eol=lf
+install.sh text eol=lf
+uninstall.sh text eol=lf
 
-# Web files
+# Systemd service files
+*.service text eol=lf
+*.timer text eol=lf
+*.socket text eol=lf
+*.target text eol=lf
+*.path text eol=lf
+
+# Environment and config
+*.env text
+*.env.example text
+.envrc text
+
+# Web files (for dashboard/API)
 *.html text diff=html
-*.htm text diff=html
 *.css text diff=css
 *.js text
-*.ts text
-*.razor text
 
-# Resource files
-*.resx text
-
-# Serialization
-*.xaml text
-
-# Build outputs - binary
-*.dll binary
-*.exe binary
-*.pdb binary
-
-# Package files - binary
-*.nupkg binary
-*.snupkg binary
+# Compiled binaries - binary
+target/** binary
 
 # Compressed files - binary
 *.zip binary
-*.7z binary
 *.gz binary
 *.tar binary
+*.tar.gz binary
+*.xz binary
 
 # Image files - binary
 *.png binary
@@ -69,34 +66,27 @@ AUTHORS text
 *.gif binary
 *.ico binary
 *.svg text
-*.bmp binary
 *.webp binary
 
-# Font files - binary
-*.ttf binary
-*.otf binary
-*.woff binary
-*.woff2 binary
-*.eot binary
-
 # Database files - binary
-*.mdf binary
-*.ldf binary
-*.sqlite binary
 *.db binary
+*.sqlite binary
+*.sqlite3 binary
 
-# Visual Studio files
-*.suo binary
-*.user text
-*.dbmdl binary
-*.jfm binary
+# Log files
+*.log text
 
-# NuGet
-packages.lock.json text
-
-# EditorConfig
-.editorconfig text
+# Docker
+Dockerfile text
+docker-compose.yml text
+docker-compose.yaml text
+.dockerignore text
 
 # Git files
 .gitignore text
 .gitattributes text
+
+# CI/CD
+.github/**/*.yml text
+.github/**/*.yaml text
+.gitlab-ci.yml text
