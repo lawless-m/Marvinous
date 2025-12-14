@@ -1,0 +1,102 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# C# source files
+*.cs text diff=csharp
+*.csx text diff=csharp
+
+# Project and solution files
+*.csproj text merge=union
+*.sln text eol=crlf merge=union
+*.props text
+*.targets text
+
+# Configuration files
+*.json text
+*.xml text
+*.config text
+*.yml text
+*.yaml text
+*.toml text
+
+# Documentation
+*.md text diff=markdown
+*.txt text
+LICENSE text
+AUTHORS text
+
+# Scripts
+*.ps1 text eol=crlf
+*.psm1 text eol=crlf
+*.psd1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.sh text eol=lf
+
+# Web files
+*.html text diff=html
+*.htm text diff=html
+*.css text diff=css
+*.js text
+*.ts text
+*.razor text
+
+# Resource files
+*.resx text
+
+# Serialization
+*.xaml text
+
+# Build outputs - binary
+*.dll binary
+*.exe binary
+*.pdb binary
+
+# Package files - binary
+*.nupkg binary
+*.snupkg binary
+
+# Compressed files - binary
+*.zip binary
+*.7z binary
+*.gz binary
+*.tar binary
+
+# Image files - binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg text
+*.bmp binary
+*.webp binary
+
+# Font files - binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.eot binary
+
+# Database files - binary
+*.mdf binary
+*.ldf binary
+*.sqlite binary
+*.db binary
+
+# Visual Studio files
+*.suo binary
+*.user text
+*.dbmdl binary
+*.jfm binary
+
+# NuGet
+packages.lock.json text
+
+# EditorConfig
+.editorconfig text
+
+# Git files
+.gitignore text
+.gitattributes text
