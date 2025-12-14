@@ -30,6 +30,8 @@ pub struct Config {
     pub ipmi: IpmiConfig,
     #[serde(default)]
     pub gpu: GpuConfig,
+    #[serde(default)]
+    pub web: WebConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -96,6 +98,16 @@ pub struct GpuConfig {
     pub optional: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WebConfig {
+    #[serde(default = "default_false")]
+    pub enabled: bool,
+    #[serde(default = "default_web_port")]
+    pub port: u16,
+    #[serde(default = "default_web_bind")]
+    pub bind_address: String,
+}
+
 // Default value functions
 fn default_report_dir() -> PathBuf {
     PathBuf::from("/var/log/marvinous/reports")
@@ -135,6 +147,18 @@ fn default_log_priority_max() -> u8 {
 
 fn default_true() -> bool {
     true
+}
+
+fn default_false() -> bool {
+    false
+}
+
+fn default_web_port() -> u16 {
+    9090
+}
+
+fn default_web_bind() -> String {
+    "0.0.0.0".to_string()
 }
 
 fn default_max_log_entries() -> usize {
@@ -206,6 +230,16 @@ impl Default for GpuConfig {
     }
 }
 
+impl Default for WebConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            port: 9090,
+            bind_address: "0.0.0.0".to_string(),
+        }
+    }
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -216,6 +250,7 @@ impl Default for Config {
             sensors: SensorsConfig::default(),
             ipmi: IpmiConfig::default(),
             gpu: GpuConfig::default(),
+            web: WebConfig::default(),
         }
     }
 }

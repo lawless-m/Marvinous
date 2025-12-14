@@ -4,8 +4,10 @@
 
 mod collector;
 mod config;
+mod daily;
 mod llm;
 mod output;
+mod web;
 
 use chrono::Utc;
 use clap::Parser;
@@ -37,6 +39,14 @@ struct Args {
     /// Print the prompt that would be sent to the LLM
     #[arg(long)]
     show_prompt: bool,
+
+    /// Run web server for dashboard
+    #[arg(long)]
+    web_server: bool,
+
+    /// Generate daily summary and archive hourly reports
+    #[arg(long)]
+    daily_summary: bool,
 }
 
 #[tokio::main]
@@ -55,9 +65,41 @@ async fn main() -> ExitCode {
         .with_target(true)
         .init();
 
+    // Daily summary mode
+    if args.daily_summary {
+        tracing::info!("Generating daily summary - *sigh* more recursive tedium");
+
+        match daily::generate_daily_summary(&config).await {
+            Ok(_) => {
+                tracing::info!("Daily summary complete. Another pointless milestone.");
+                return ExitCode::from(0);
+            }
+            Err(e) => {
+                tracing::error!("Daily summary failed: {}", e);
+                return ExitCode::from(1);
+            }
+        }
+    }
+
+    // Web server mode
+    if args.web_server {
+        if !config.web.enabled {
+            tracing::warn!("Web server requested but not enabled in config");
+        }
+
+        tracing::info!("Starting web server mode - I suppose someone has to serve these requests");
+
+        if let Err(e) = web::run_server(config).await {
+            tracing::error!("Web server failed: {}", e);
+            return ExitCode::from(1);
+        }
+
+        return ExitCode::from(0);
+    }
+
+    // Collection mode
     tracing::info!("Marvinous starting - *sigh* here we go again");
 
-    // Run the main logic and handle exit codes
     match run(&config, &args).await {
         Ok(_) => {
             tracing::info!("Complete. Not that it matters.");
@@ -71,7 +113,7 @@ async fn main() -> ExitCode {
 }
 
 #[derive(Debug)]
-enum MarvinError {
+pub enum MarvinError {
     #[allow(dead_code)]
     Config(String),
     Collection(String),
@@ -101,7 +143,8 @@ impl std::fmt::Display for MarvinError {
     }
 }
 
-async fn run(config: &Config, args: &Args) -> Result<(), MarvinError> {
+/// Run collection and generate report (public interface for web server)
+pub async fn run_collection(config: &Config) -> Result<(), MarvinError> {
     // Collect data
     tracing::info!("Starting collection");
 
@@ -222,25 +265,8 @@ async fn run(config: &Config, args: &Args) -> Result<(), MarvinError> {
         previous,
     };
 
-    // Dry run mode
-    if args.dry_run {
-        println!("=== Collected Data ===");
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&collected).unwrap_or_else(|_| "Error".to_string())
-        );
-        return Ok(());
-    }
-
     // Build prompt
     let prompt = build_prompt(&collected, &config.general.prompt_file);
-
-    // Show prompt mode
-    if args.show_prompt {
-        println!("=== Prompt ===");
-        println!("{}", prompt);
-        return Ok(());
-    }
 
     // Initialize Ollama client
     let client = OllamaClient::new(
@@ -292,4 +318,147 @@ async fn run(config: &Config, args: &Args) -> Result<(), MarvinError> {
     }
 
     Ok(())
+}
+
+/// CLI wrapper for run_collection with dry-run and show-prompt support
+async fn run(config: &Config, args: &Args) -> Result<(), MarvinError> {
+    // For dry-run and show-prompt modes, we need to collect data manually
+    if args.dry_run || args.show_prompt {
+        tracing::info!("Starting collection");
+
+        let system_logs = match collect_system_logs(
+            &config.collection.log_since,
+            config.collection.log_priority_max,
+            config.collection.max_log_entries,
+        ) {
+            Ok(logs) => {
+                tracing::info!("Collected {} system log entries", logs.len());
+                logs
+            }
+            Err(e) => {
+                tracing::warn!("Failed to collect system logs: {}", e);
+                vec![]
+            }
+        };
+
+        let kernel_logs = if config.collection.include_kernel {
+            match collect_kernel_logs(&config.collection.log_since, config.collection.max_log_entries) {
+                Ok(logs) => {
+                    tracing::info!("Collected {} kernel log entries", logs.len());
+                    logs
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to collect kernel logs: {}", e);
+                    vec![]
+                }
+            }
+        } else {
+            vec![]
+        };
+
+        let sensors = if config.sensors.enabled {
+            match collect_sensors() {
+                Ok(readings) => {
+                    tracing::info!("Collected {} sensor readings", readings.len());
+                    readings
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to collect sensor data: {}", e);
+                    vec![]
+                }
+            }
+        } else {
+            vec![]
+        };
+
+        let ipmi = if config.ipmi.enabled {
+            match collect_ipmi() {
+                Ok(readings) => {
+                    tracing::info!("Collected {} IPMI sensor readings", readings.len());
+                    readings
+                }
+                Err(e) => {
+                    if config.ipmi.optional {
+                        tracing::warn!("Failed to collect IPMI data (optional): {}", e);
+                        vec![]
+                    } else {
+                        return Err(MarvinError::Collection(format!("IPMI collection failed: {}", e)));
+                    }
+                }
+            }
+        } else {
+            vec![]
+        };
+
+        let gpu = if config.gpu.enabled {
+            match collect_gpu() {
+                Ok(Some(gpu)) => {
+                    tracing::info!("GPU detected: {}", gpu.name);
+                    Some(gpu)
+                }
+                Ok(None) => {
+                    tracing::info!("No NVIDIA GPU detected");
+                    None
+                }
+                Err(e) => {
+                    if config.gpu.optional {
+                        tracing::warn!("Failed to collect GPU data (optional): {}", e);
+                        None
+                    } else {
+                        return Err(MarvinError::Collection(format!("GPU collection failed: {}", e)));
+                    }
+                }
+            }
+        } else {
+            None
+        };
+
+        let drives = match collect_smart(&config.storage.devices) {
+            Ok(drives) => {
+                tracing::info!("Checked {} drives", drives.len());
+                drives
+            }
+            Err(e) => {
+                tracing::warn!("Failed to collect SMART data: {}", e);
+                vec![]
+            }
+        };
+
+        let previous = match load_previous(&config.general.state_file) {
+            Ok(prev) => prev,
+            Err(e) => {
+                tracing::warn!("Failed to load previous state: {}", e);
+                None
+            }
+        };
+
+        let collected = CollectedData {
+            system_logs,
+            kernel_logs,
+            sensors,
+            ipmi,
+            gpu,
+            drives,
+            previous,
+        };
+
+        if args.dry_run {
+            println!("=== Collected Data ===");
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&collected).unwrap_or_else(|_| "Error".to_string())
+            );
+            return Ok(());
+        }
+
+        if args.show_prompt {
+            let prompt = build_prompt(&collected, &config.general.prompt_file);
+            println!("=== Prompt ===");
+            println!("{}", prompt);
+            return Ok(());
+        }
+    }
+
+    // Normal mode: just run collection
+    run_collection(config).await
 }

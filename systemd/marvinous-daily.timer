@@ -1,0 +1,13 @@
+[Unit]
+Description=Marvinous Daily Summary Timer
+Documentation=https://github.com/lawless-m/Marvinous
+Requires=marvinous-daily.service
+
+[Timer]
+# Run at 00:05 every day
+OnCalendar=*-*-* 00:05:00
+AccuracySec=1min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

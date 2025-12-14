@@ -1,0 +1,16 @@
+[Unit]
+Description=Marvinous Daily Summary
+Documentation=https://github.com/lawless-m/Marvinous
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/marvinous --daily-summary
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=marvinous-daily
+
+[Install]
+WantedBy=multi-user.target

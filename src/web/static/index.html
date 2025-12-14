@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Marvinous Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0a0a0a;
+            color: #33ff33;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 20px;
+            border: 2px solid #33ff33;
+            background: #111;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 0 0 10px #33ff33;
+        }
+
+        .tagline {
+            font-size: 1.2em;
+            opacity: 0.8;
+            font-style: italic;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding: 15px;
+            background: #111;
+            border: 1px solid #33ff33;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #33ff33;
+            box-shadow: 0 0 10px #33ff33;
+        }
+
+        .status-dot.running {
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        button {
+            background: #1a1a1a;
+            color: #33ff33;
+            border: 2px solid #33ff33;
+            padding: 10px 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background: #33ff33;
+            color: #0a0a0a;
+            box-shadow: 0 0 15px #33ff33;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .reports-list {
+            display: grid;
+            gap: 15px;
+        }
+
+        .report-item {
+            background: #111;
+            border: 1px solid #33ff33;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .report-item:hover {
+            border-color: #66ff66;
+            box-shadow: 0 0 15px rgba(51, 255, 51, 0.3);
+        }
+
+        .report-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .report-meta {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .severity {
+            padding: 4px 12px;
+            border-radius: 3px;
+            font-size: 0.9em;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .severity.ok {
+            background: #33ff33;
+            color: #0a0a0a;
+        }
+
+        .severity.watch {
+            background: #ffaa00;
+            color: #0a0a0a;
+        }
+
+        .severity.concern {
+            background: #ff6600;
+            color: #fff;
+        }
+
+        .severity.critical {
+            background: #ff0000;
+            color: #fff;
+            animation: pulse 2s infinite;
+        }
+
+        .severity.unknown {
+            background: #666;
+            color: #fff;
+        }
+
+        .timestamp {
+            opacity: 0.8;
+        }
+
+        .report-content {
+            display: none;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #33ff33;
+            white-space: pre-wrap;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .report-content.visible {
+            display: block;
+        }
+
+        .report-content h1,
+        .report-content h2,
+        .report-content h3 {
+            color: #66ff66;
+            margin: 15px 0 10px 0;
+        }
+
+        .report-content strong {
+            color: #66ff66;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 1.2em;
+            opacity: 0.8;
+        }
+
+        .error {
+            background: #ff3333;
+            color: #fff;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 3px;
+        }
+
+        .empty {
+            text-align: center;
+            padding: 60px;
+            opacity: 0.6;
+            font-size: 1.2em;
+        }
+
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0a0a0a;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #33ff33;
+            border-radius: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #66ff66;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>MARVINOUS</h1>
+            <p class="tagline">"Here I am, brain the size of a planet, and they ask me to watch log files."</p>
+        </header>
+
+        <div class="controls">
+            <div class="status">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">Idle</span>
+                <span id="lastRun" style="opacity: 0.6; margin-left: 10px;"></span>
+            </div>
+            <button id="collectBtn" onclick="triggerCollection()">Run Collection</button>
+        </div>
+
+        <div id="errorMsg"></div>
+        <div id="reportsList" class="loading">Loading reports...</div>
+    </div>
+
+    <script>
+        let currentStatus = { running: false, last_run: null };
+        let statusCheckInterval;
+
+        // Initialize dashboard
+        async function init() {
+            await loadReports();
+            await updateStatus();
+            // Check status every 5 seconds
+            statusCheckInterval = setInterval(updateStatus, 5000);
+        }
+
+        // Load all reports
+        async function loadReports() {
+            try {
+                const response = await fetch('/api/reports');
+                if (!response.ok) throw new Error('Failed to load reports');
+
+                const data = await response.json();
+                renderReports(data.reports);
+            } catch (err) {
+                showError('Failed to load reports: ' + err.message);
+            }
+        }
+
+        // Render reports list
+        function renderReports(reports) {
+            const container = document.getElementById('reportsList');
+
+            if (reports.length === 0) {
+                container.innerHTML = '<div class="empty">No reports yet. Brain the size of a planet and nothing to analyze.</div>';
+                return;
+            }
+
+            container.innerHTML = reports.map((report, index) => `
+                <div class="report-item" onclick="toggleReport(${index}, '${report.filename}')">
+                    <div class="report-header">
+                        <div class="report-meta">
+                            <span class="severity ${report.severity}">${report.severity}</span>
+                            <span class="timestamp">${formatTimestamp(report.timestamp)}</span>
+                        </div>
+                        <span>${formatSize(report.size_bytes)}</span>
+                    </div>
+                    <div class="report-filename">${report.filename}</div>
+                    <div class="report-content" id="content-${index}"></div>
+                </div>
+            `).join('');
+        }
+
+        // Toggle report content visibility
+        async function toggleReport(index, filename) {
+            const contentDiv = document.getElementById(`content-${index}`);
+
+            if (contentDiv.classList.contains('visible')) {
+                contentDiv.classList.remove('visible');
+                return;
+            }
+
+            // Load content if not already loaded
+            if (!contentDiv.dataset.loaded) {
+                try {
+                    const response = await fetch(`/api/reports/${filename}`);
+                    if (!response.ok) throw new Error('Failed to load report');
+
+                    const data = await response.json();
+                    contentDiv.textContent = data.content;
+                    contentDiv.dataset.loaded = 'true';
+                } catch (err) {
+                    contentDiv.textContent = 'Error loading report: ' + err.message;
+                }
+            }
+
+            contentDiv.classList.add('visible');
+        }
+
+        // Trigger manual collection
+        async function triggerCollection() {
+            const btn = document.getElementById('collectBtn');
+            btn.disabled = true;
+
+            try {
+                const response = await fetch('/api/collect', { method: 'POST' });
+                if (!response.ok) throw new Error('Failed to trigger collection');
+
+                const data = await response.json();
+
+                if (data.status === 'started') {
+                    showSuccess('Collection started in background');
+                } else if (data.status === 'already_running') {
+                    showInfo('Collection already in progress');
+                }
+
+                // Update status immediately
+                await updateStatus();
+            } catch (err) {
+                showError('Failed to trigger collection: ' + err.message);
+            } finally {
+                setTimeout(() => btn.disabled = false, 2000);
+            }
+        }
+
+        // Update collection status
+        async function updateStatus() {
+            try {
+                const response = await fetch('/api/status');
+                if (!response.ok) throw new Error('Failed to get status');
+
+                const data = await response.json();
+                currentStatus = data;
+
+                const dot = document.getElementById('statusDot');
+                const text = document.getElementById('statusText');
+                const lastRun = document.getElementById('lastRun');
+
+                if (data.running) {
+                    dot.classList.add('running');
+                    text.textContent = 'Collection Running';
+                } else {
+                    dot.classList.remove('running');
+                    text.textContent = 'Idle';
+                }
+
+                if (data.last_run) {
+                    lastRun.textContent = 'Last run: ' + formatTimestamp(data.last_run);
+                } else {
+                    lastRun.textContent = '';
+                }
+            } catch (err) {
+                console.error('Failed to update status:', err);
+            }
+        }
+
+        // Format timestamp
+        function formatTimestamp(ts) {
+            const date = new Date(ts);
+            return date.toLocaleString();
+        }
+
+        // Format file size
+        function formatSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        // Show error message
+        function showError(msg) {
+            const container = document.getElementById('errorMsg');
+            container.innerHTML = `<div class="error">${msg}</div>`;
+            setTimeout(() => container.innerHTML = '', 5000);
+        }
+
+        // Show success message
+        function showSuccess(msg) {
+            const container = document.getElementById('errorMsg');
+            container.innerHTML = `<div class="error" style="background: #33ff33; color: #0a0a0a;">${msg}</div>`;
+            setTimeout(() => container.innerHTML = '', 3000);
+        }
+
+        // Show info message
+        function showInfo(msg) {
+            const container = document.getElementById('errorMsg');
+            container.innerHTML = `<div class="error" style="background: #ffaa00; color: #0a0a0a;">${msg}</div>`;
+            setTimeout(() => container.innerHTML = '', 3000);
+        }
+
+        // Start the dashboard
+        init();
+    </script>
+</body>
+</html>

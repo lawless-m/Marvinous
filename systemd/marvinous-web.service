@@ -1,0 +1,29 @@
+[Unit]
+Description=Marvinous Web Dashboard
+Documentation=https://github.com/lawless-m/Marvinous
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/marvinous --web-server
+Restart=always
+RestartSec=10
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/marvinous
+ReadOnlyPaths=/etc/marvinous
+
+# Process isolation
+User=root
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=marvinous-web
+
+[Install]
+WantedBy=multi-user.target
