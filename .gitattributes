@@ -27,3 +27,12 @@ target/** binary
 
 # Exclude template/utility scripts from language stats
 sync-repo.ps1 linguist-vendored
+
+# Exclude Claude Code skills (example files) from language stats
+.claude/** linguist-vendored
+
+# Exclude images and documentation from language stats
+*.png linguist-vendored
+spellbook.png linguist-vendored
+BUILD_AND_DEPLOY.md linguist-documentation
+WINDOWS_SYNC_SETUP.md linguist-documentation
