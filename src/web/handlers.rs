@@ -13,6 +13,7 @@ use super::{
     models::*,
     state::AppState,
 };
+use crate::output::parse_severity;
 
 /// List all available reports
 pub async fn list_reports(
@@ -193,12 +194,20 @@ pub async fn health_check() -> Json<HealthResponse> {
 
 // Helper functions
 
-/// Parse timestamp from filename (format: YYYY-MM-DD-HH.md)
+/// Parse timestamp from filename (format: YYYY-MM-DD-HH.md or YYYY-MM-DD-DAILY.md)
 fn parse_filename_timestamp(filename: &str) -> DateTime<Utc> {
     // Remove .md extension
     let name = filename.trim_end_matches(".md");
 
-    // Try to parse YYYY-MM-DD-HH format
+    // Handle DAILY files: YYYY-MM-DD-DAILY -> use midnight of that date
+    if name.ends_with("-DAILY") {
+        let date_part = name.trim_end_matches("-DAILY");
+        if let Ok(naive) = NaiveDateTime::parse_from_str(&format!("{}-00-00-00", date_part), "%Y-%m-%d-%H-%M-%S") {
+            return DateTime::from_naive_utc_and_offset(naive, Utc);
+        }
+    }
+
+    // Try to parse YYYY-MM-DD-HH format for hourly reports
     if let Ok(naive) = NaiveDateTime::parse_from_str(&format!("{}-00-00", name), "%Y-%m-%d-%H-%M-%S") {
         return DateTime::from_naive_utc_and_offset(naive, Utc);
     }
@@ -207,25 +216,8 @@ fn parse_filename_timestamp(filename: &str) -> DateTime<Utc> {
     DateTime::from_timestamp(0, 0).unwrap()
 }
 
-/// Extract severity from report content
-/// Matches the logic in src/output/report.rs::parse_severity
+/// Extract severity from report content using shared parser
 fn extract_severity(path: &std::path::Path) -> Option<String> {
     let content = std::fs::read_to_string(path).ok()?;
-    let content_upper = content.to_uppercase();
-
-    // Check for severity markers in order of importance
-    if content_upper.contains("CRITICAL:") || content_upper.contains("CRITICAL]") {
-        return Some("critical".to_string());
-    }
-    if content_upper.contains("CONCERN:") || content_upper.contains("CONCERN]") {
-        return Some("concern".to_string());
-    }
-    if content_upper.contains("WATCH:") || content_upper.contains("WATCH]") {
-        return Some("watch".to_string());
-    }
-    if content_upper.contains("OK:") || content_upper.contains("OK]") {
-        return Some("ok".to_string());
-    }
-
-    Some("unknown".to_string())
+    Some(parse_severity(&content).to_string().to_lowercase())
 }

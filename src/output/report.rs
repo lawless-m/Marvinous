@@ -58,26 +58,47 @@ pub fn write_report(
 
 /// Parse severity from report content
 pub fn parse_severity(content: &str) -> Severity {
-    // Look for severity in the Summary section
+    // Look for severity ONLY in the Summary section
     // Format: "## Summary\n[SEVERITY]: ..."
+    // This prevents false positives from Marvin's existential commentary elsewhere
 
-    let content_upper = content.to_uppercase();
+    let summary = extract_summary_section(content);
+    let summary_upper = summary.to_uppercase();
 
     // Check for severity markers in order of importance
-    if content_upper.contains("CRITICAL:") || content_upper.contains("CRITICAL]") {
+    if summary_upper.contains("CRITICAL:") || summary_upper.contains("CRITICAL]") {
         return Severity::Critical;
     }
-    if content_upper.contains("CONCERN:") || content_upper.contains("CONCERN]") {
+    if summary_upper.contains("CONCERN:") || summary_upper.contains("CONCERN]") {
         return Severity::Concern;
     }
-    if content_upper.contains("WATCH:") || content_upper.contains("WATCH]") {
+    if summary_upper.contains("WATCH:") || summary_upper.contains("WATCH]") {
         return Severity::Watch;
     }
-    if content_upper.contains("OK:") || content_upper.contains("OK]") {
+    if summary_upper.contains("OK:") || summary_upper.contains("OK]") {
         return Severity::Ok;
     }
 
     Severity::Unknown
+}
+
+/// Extract just the Summary section from a report
+fn extract_summary_section(content: &str) -> &str {
+    // Find "## Summary" header
+    let summary_start = content.find("## Summary");
+    if summary_start.is_none() {
+        return "";
+    }
+    let start = summary_start.unwrap();
+
+    // Find the next "##" header after Summary (end of section)
+    let after_header = start + "## Summary".len();
+    let section_end = content[after_header..]
+        .find("\n##")
+        .map(|pos| after_header + pos)
+        .unwrap_or(content.len());
+
+    &content[start..section_end]
 }
 
 #[cfg(test)]
@@ -122,5 +143,19 @@ WATCH: Temperatures are elevated.
 CONCERN: Storage health degradation detected.
 "#;
         assert_eq!(parse_severity(content), Severity::Concern);
+    }
+
+    #[test]
+    fn test_parse_severity_ignores_outside_summary() {
+        // Marvin's existential dread shouldn't trigger false positives
+        let content = r#"# Marvinous Report: 2025-12-18 15:00
+
+## Summary
+[OK]: Another uneventful hour, as expected.
+
+## Hardware Health Overview
+[CRITICAL]: My existence is a constant reminder that nothing matters, but hey, at least the hardware's doing fine.
+"#;
+        assert_eq!(parse_severity(content), Severity::Ok);
     }
 }
