@@ -148,6 +148,21 @@ pub async fn run_collection(config: &Config) -> Result<(), MarvinError> {
     // Collect data
     tracing::info!("Starting collection");
 
+    // Load hardware baseline for filtering
+    use crate::config::HardwareBaseline;
+    use std::path::Path;
+    let baseline_path = Path::new("/etc/marvinous/hardware-baseline.toml");
+    let baseline = HardwareBaseline::load_or_default(baseline_path);
+    if baseline.memory.installed_slots.is_empty() && baseline.cooling.installed_fans.is_empty() {
+        tracing::warn!("Hardware baseline not configured or empty, IPMI filtering disabled");
+    } else {
+        tracing::info!(
+            "Loaded hardware baseline: {} DIMMs, {} fans",
+            baseline.memory.installed_slots.len(),
+            baseline.cooling.installed_fans.len()
+        );
+    }
+
     let system_logs = match collect_system_logs(
         &config.collection.log_since,
         config.collection.log_priority_max,
@@ -197,7 +212,11 @@ pub async fn run_collection(config: &Config) -> Result<(), MarvinError> {
         match collect_ipmi() {
             Ok(readings) => {
                 tracing::info!("Collected {} IPMI sensor readings", readings.len());
-                readings
+                // Apply baseline filtering to remove "no reading" entries for non-installed hardware
+                use crate::collector::ipmi::filter_ipmi_readings;
+                let filtered = filter_ipmi_readings(readings, &baseline);
+                tracing::info!("After baseline filtering: {} IPMI sensor readings", filtered.len());
+                filtered
             }
             Err(e) => {
                 if config.ipmi.optional {
@@ -326,6 +345,21 @@ async fn run(config: &Config, args: &Args) -> Result<(), MarvinError> {
     if args.dry_run || args.show_prompt {
         tracing::info!("Starting collection");
 
+        // Load hardware baseline for filtering
+        use crate::config::HardwareBaseline;
+        use std::path::Path;
+        let baseline_path = Path::new("/etc/marvinous/hardware-baseline.toml");
+        let baseline = HardwareBaseline::load_or_default(baseline_path);
+        if baseline.memory.installed_slots.is_empty() && baseline.cooling.installed_fans.is_empty() {
+            tracing::warn!("Hardware baseline not configured or empty, IPMI filtering disabled");
+        } else {
+            tracing::info!(
+                "Loaded hardware baseline: {} DIMMs, {} fans",
+                baseline.memory.installed_slots.len(),
+                baseline.cooling.installed_fans.len()
+            );
+        }
+
         let system_logs = match collect_system_logs(
             &config.collection.log_since,
             config.collection.log_priority_max,
@@ -375,7 +409,11 @@ async fn run(config: &Config, args: &Args) -> Result<(), MarvinError> {
             match collect_ipmi() {
                 Ok(readings) => {
                     tracing::info!("Collected {} IPMI sensor readings", readings.len());
-                    readings
+                    // Apply baseline filtering to remove "no reading" entries for non-installed hardware
+                    use crate::collector::ipmi::filter_ipmi_readings;
+                    let filtered = filter_ipmi_readings(readings, &baseline);
+                    tracing::info!("After baseline filtering: {} IPMI sensor readings", filtered.len());
+                    filtered
                 }
                 Err(e) => {
                     if config.ipmi.optional {

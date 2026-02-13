@@ -2,6 +2,7 @@
 //!
 //! "Life? Don't talk to me about life."
 
+use crate::config::HardwareBaseline;
 use serde::{Deserialize, Serialize};
 use std::process::Command;
 use thiserror::Error;
@@ -58,4 +59,62 @@ pub fn collect_ipmi() -> Result<Vec<IpmiReading>, IpmiError> {
     }
 
     Ok(readings)
+}
+
+/// Filter IPMI readings based on hardware baseline
+/// Removes "no reading" entries for non-installed hardware while preserving them for installed hardware
+/// (since "no reading" for installed hardware indicates a failure)
+pub fn filter_ipmi_readings(
+    readings: Vec<IpmiReading>,
+    baseline: &HardwareBaseline,
+) -> Vec<IpmiReading> {
+    let before_count = readings.len();
+
+    let filtered: Vec<IpmiReading> = readings
+        .into_iter()
+        .filter(|reading| {
+            // If the reading has a valid value, always keep it
+            if reading.value != "no reading" && reading.status != "ns" {
+                return true;
+            }
+
+            // For "no reading" entries, check against baseline
+            let sensor_name = &reading.sensor;
+
+            // Check if it's a DIMM sensor
+            if sensor_name.starts_with("DIMM_") {
+                // Keep if it's in the installed slots (failure detection)
+                // Remove if it's not installed (empty slot, expected)
+                let is_installed = baseline.memory.installed_slots.contains(sensor_name);
+                if is_installed {
+                    tracing::warn!("Installed DIMM {} has no reading - possible hardware failure!", sensor_name);
+                }
+                return is_installed;
+            }
+
+            // Check if it's a fan sensor (contains "_FAN" anywhere in the name)
+            if sensor_name.contains("_FAN") {
+                // Keep if it's in the installed fans (failure detection)
+                // Remove if it's not installed (empty header, expected)
+                let is_installed = baseline.cooling.installed_fans.contains(sensor_name);
+                if is_installed {
+                    tracing::warn!("Installed fan {} has no reading - possible hardware failure!", sensor_name);
+                }
+                return is_installed;
+            }
+
+            // For other sensor types, keep them to be conservative
+            true
+        })
+        .collect();
+
+    let filtered_count = before_count - filtered.len();
+    tracing::info!(
+        "IPMI filtering: {} -> {} sensors ({} filtered)",
+        before_count,
+        filtered.len(),
+        filtered_count
+    );
+
+    filtered
 }

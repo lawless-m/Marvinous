@@ -108,6 +108,26 @@ pub struct WebConfig {
     pub bind_address: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HardwareBaseline {
+    #[serde(default)]
+    pub memory: MemoryBaseline,
+    #[serde(default)]
+    pub cooling: CoolingBaseline,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct MemoryBaseline {
+    #[serde(default)]
+    pub installed_slots: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct CoolingBaseline {
+    #[serde(default)]
+    pub installed_fans: Vec<String>,
+}
+
 // Default value functions
 fn default_report_dir() -> PathBuf {
     PathBuf::from("/var/log/marvinous/reports")
@@ -289,6 +309,32 @@ impl Config {
         match Self::load_with_env(path) {
             Ok(config) => config,
             Err(_) => Self::default(),
+        }
+    }
+}
+
+impl HardwareBaseline {
+    /// Load hardware baseline from a file
+    pub fn load(path: &Path) -> Result<Self, ConfigError> {
+        let content = std::fs::read_to_string(path)?;
+        let baseline: HardwareBaseline = toml::from_str(&content)?;
+        Ok(baseline)
+    }
+
+    /// Load baseline or return empty if file doesn't exist
+    pub fn load_or_default(path: &Path) -> Self {
+        match Self::load(path) {
+            Ok(baseline) => baseline,
+            Err(_) => Self::default(),
+        }
+    }
+}
+
+impl Default for HardwareBaseline {
+    fn default() -> Self {
+        Self {
+            memory: MemoryBaseline::default(),
+            cooling: CoolingBaseline::default(),
         }
     }
 }
